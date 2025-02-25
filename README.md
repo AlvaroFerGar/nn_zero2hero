@@ -27,6 +27,11 @@ Further improvements and adjustments to the MLP implementation.
 - [nb📕](karpathings_04_MLP/makemore_03.ipynb): Revisiting the MLP implementation with improvements.
 - [nb📘](karpathings_04_MLP/makemore_03_ipynb_pytorch.ipynb): Implementing the MLP model adding more layers and imitating PyTorch.
 
+### 🥷🏂 05-MLP v3
+Replacing loss.backwards() with a manual backprop implementation
+- [**Readme**](karpathings_05_MLP/README.md)
+- [nb📕](karpathings_05_MLP/makemore_04.ipynb): Becoming a backprop ninja
+
 ## 🔗 References
 
 - [Neural Networks: Zero to Hero Lecture Series](https://www.youtube.com/watch?v=VMj-3S1tku0&list=PLAqhIrjkxbuWI23v9cThsA9GvCAUhRvKZ)
