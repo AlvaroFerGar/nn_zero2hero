@@ -32,6 +32,13 @@ Replacing loss.backwards() with a manual backprop implementation
 - [**Readme**](karpathings_05_MLP/README.md)
 - [nb📕](karpathings_05_MLP/makemore_04.ipynb): Becoming a backprop ninja
 
+### 🌊🎵 06-WaveNet
+Replacing loss.backwards() with a manual backprop implementation
+- [**Readme**](karpathings_06_wavenet/README.md)
+- [nb📕](karpathings_06_wavenet/makemore_05_init.ipynb): Initial notebook, used for comparision if needed
+- [nb📘](karpathings_06_wavenet/makemore_05_fixes.ipynb): Bug fixes in previous MLP works.
+- [nb📗](karpathings_06_wavenet/makemore_05_wavenet.ipynb): Implementing WaveNet
+
 ## 🔗 References
 
 - [Neural Networks: Zero to Hero Lecture Series](https://www.youtube.com/watch?v=VMj-3S1tku0&list=PLAqhIrjkxbuWI23v9cThsA9GvCAUhRvKZ)
