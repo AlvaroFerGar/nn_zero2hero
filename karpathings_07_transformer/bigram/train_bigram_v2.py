@@ -6,9 +6,9 @@ import os
 # hyperparameters
 batch_size = 32 # how many independent sequences will we process in parallel?
 block_size = 8 #  Maximum context length for predictions (how many previous tokens the model sees)
-max_iters = 3000
-eval_interval = 300
-learning_rate = 1e-2
+max_iters = 5000
+eval_interval = 500
+learning_rate = 1e-3 # self-attention models are more sensitive to learning rate
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 device = 'cpu'# Overrides the previous line to force CPU usage
 eval_iters = 200
@@ -69,6 +69,86 @@ def estimate_loss():
     model.train()# Set model back to training mode
     return out
 
+
+
+class Head(nn.Module):
+    """ one head of self-attention """
+
+    def __init__(self, head_size):
+        super().__init__()
+        self.key = nn.Linear(n_embd, head_size, bias=False)# what information do i contain?
+        self.query = nn.Linear(n_embd, head_size, bias=False)# what am i looking for in other tokens?
+        self.value = nn.Linear(n_embd, head_size, bias=False)# what information do i contribute?
+        self.register_buffer('tril', torch.tril(torch.ones(block_size, block_size)))# pytorch things. As tril is not a parameter, its stored as a buffer
+
+
+    def forward(self, x):
+        # input of size (batch, time-step, channels)
+        # output of size (batch, time-step, head size)
+        B,T,C = x.shape
+        k = self.key(x)    # (B, T, 16)- keys for all tokens
+        q = self.query(x)  # (B, T, 16)- queries for all tokens
+        # compute attention scores ("affinities")
+        # Each query vectors dot product with all key vectors to calculate attention scores
+        # If a query and key are aligned (similar direction), they'll produce a high score
+        wei = q @ k.transpose(-2,-1) * (k.shape[-1]**-0.5) # (B, T, hs) @ (B, hs, T) -> (B, T, T)
+        # This gives us a BxTxT tensor where each value at position (i,j) 
+        # represents how much token i should attend to token j
+        # For each batch, we get a TxT attention matrix (affinity matrix)
+
+        wei = wei.masked_fill(self.tril[:T, :T] == 0, float('-inf')) # (B, T, T)# mask out future positions
+        wei = F.softmax(wei, dim=-1) # (B, T, T)
+
+        # perform the weighted aggregation of the values
+        v = self.value(x) # (B,T,hs)
+        out = wei @ v # (B, T, T) @ (B, T, hs) -> (B, T, hs)
+        return out
+
+class MultiHeadAttention(nn.Module):
+   """ multiple heads of self-attention in parallel """
+   def __init__(self, num_heads, head_size):
+       super().__init__()
+       # Create multiple attention heads in a list
+       self.heads = nn.ModuleList([Head(head_size) for _ in range(num_heads)])
+       
+   def forward(self, x):
+       # Run input through each attention head in parallel
+       # Concatenate the outputs from all heads along the feature dimension
+       # This gives us num_heads * head_size total features per token
+       out = torch.cat([h(x) for h in self.heads], dim=-1)
+       return out
+
+class FeedFoward(nn.Module):
+    """ a simple linear layer followed by a non-linearity """
+
+    def __init__(self, n_embd):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(n_embd, 4 * n_embd),
+            nn.ReLU(),
+        )
+
+    def forward(self, x):
+        return self.net(x)
+
+
+class TransformerBlock(nn.Module):
+    """ Transformer block: communication followed by computation """
+
+    def __init__(self, n_embd, n_head):
+        # n_embd: embedding dimension, n_head: the number of heads we'd like
+        super().__init__()
+        head_size = n_embd // n_head
+        self.sa = MultiHeadAttention(n_head, head_size)
+        self.ffwd = FeedFoward(n_embd)
+        self.ln1 = nn.LayerNorm(n_embd)
+        self.ln2 = nn.LayerNorm(n_embd)
+
+    def forward(self, x):
+        x = x + self.sa(self.ln1(x))
+        x = x + self.ffwd(self.ln2(x))
+        return x
+
 # super simple bigram model
 class BigramLanguageModel(nn.Module):
     """
@@ -82,7 +162,11 @@ class BigramLanguageModel(nn.Module):
         # This embedding table effectively stores the probability distribution of what comes after each token
         self.token_embedding_table = nn.Embedding(vocab_size, n_embd)
         self.position_embedding_table= nn.Embedding(block_size, n_embd) #each position gets its own embedding vector
-        self.head = nn.Linear(n_embd, vocab_size)
+
+        #instead one large head we make a small group of heads
+        self.selfattn_heads = MultiHeadAttention(4, n_embd//4)
+        self.feedforward = FeedFoward(n_embd)
+        self.languagemodel_head = nn.Linear(n_embd, vocab_size)
 
     def forward(self, idx, targets=None):
         B, T = idx.shape  # Batch size, Sequence length/block_size
@@ -93,8 +177,10 @@ class BigramLanguageModel(nn.Module):
         pos_embd = self.position_embedding_table(torch.arange(T, device=idx.device)) # Shape: (sequence_length, n_embd)
         
         x= tok_embd + pos_embd #x is the sum(!!!) of the token and position embeddings
-        
-        logits = self.head(x) # Shape: (batch_size, sequence_length, vocab_size)
+        x= self.selfattn_heads(x) # Shape: (batch_size, sequence_length, n_embd)
+        x=self.feedforward(x) # B,T,C
+
+        logits = self.languagemodel_head(x) # Shape: (batch_size, sequence_length, vocab_size)
 
         if targets is None:
             loss = None# If no targets provided, don't compute loss
@@ -120,8 +206,10 @@ class BigramLanguageModel(nn.Module):
         """
         # idx is (B, T) array of indices in the current context
         for _ in range(max_new_tokens):
+            #cropt idx to the last block_size tokens
+            idx_cond = idx[:, -block_size:]
             # get the predictions
-            logits, _ = self(idx)
+            logits, _ = self(idx_cond)
             # Focus only on the last token in each sequence
             logits = logits[:, -1, :] # becomes (B, C)
             # Convert logits to probabilities with softmax
