@@ -14,6 +14,9 @@ device = 'cpu'# Overrides the previous line to force CPU usage
 eval_iters = 200
 # ------------
 n_embd = 32
+n_head = 6
+n_layer = 6
+dropout = 0.2
 
 
 torch.manual_seed(1337)
@@ -110,12 +113,14 @@ class MultiHeadAttention(nn.Module):
        super().__init__()
        # Create multiple attention heads in a list
        self.heads = nn.ModuleList([Head(head_size) for _ in range(num_heads)])
+       self.projection = nn.Linear(n_embd, n_embd)
        
    def forward(self, x):
        # Run input through each attention head in parallel
        # Concatenate the outputs from all heads along the feature dimension
        # This gives us num_heads * head_size total features per token
        out = torch.cat([h(x) for h in self.heads], dim=-1)
+       out = self.projection(out)
        return out
 
 class FeedFoward(nn.Module):
@@ -126,6 +131,7 @@ class FeedFoward(nn.Module):
         self.net = nn.Sequential(
             nn.Linear(n_embd, 4 * n_embd),
             nn.ReLU(),
+            nn.Linear(4*n_embd, n_embd), #projection latyer
         )
 
     def forward(self, x):
@@ -133,20 +139,24 @@ class FeedFoward(nn.Module):
 
 
 class TransformerBlock(nn.Module):
-    """ Transformer block: communication followed by computation """
+    """ Transformer block: communication followed by computation 
+        (without cross attention)
+    """
 
     def __init__(self, n_embd, n_head):
         # n_embd: embedding dimension, n_head: the number of heads we'd like
         super().__init__()
         head_size = n_embd // n_head
-        self.sa = MultiHeadAttention(n_head, head_size)
-        self.ffwd = FeedFoward(n_embd)
-        self.ln1 = nn.LayerNorm(n_embd)
-        self.ln2 = nn.LayerNorm(n_embd)
+        self.self_attention = MultiHeadAttention(n_head, head_size)
+        self.feedforward = FeedFoward(n_embd)
+        self.layernorm1=nn.LayerNorm(n_embd)#applied before the self-attention
+        self.layernorm2=nn.LayerNorm(n_embd)#applied before feed forward
 
     def forward(self, x):
-        x = x + self.sa(self.ln1(x))
-        x = x + self.ffwd(self.ln2(x))
+        #x = self.sa(x)
+        #x = self.ffwd(x)
+        x = x + self.self_attention(self.layernorm1(x)) #residual connection
+        x = x + self.feedforward(self.layernorm2(x))
         return x
 
 # super simple bigram model
@@ -163,10 +173,17 @@ class BigramLanguageModel(nn.Module):
         self.token_embedding_table = nn.Embedding(vocab_size, n_embd)
         self.position_embedding_table= nn.Embedding(block_size, n_embd) #each position gets its own embedding vector
 
-        #instead one large head we make a small group of heads
-        self.selfattn_heads = MultiHeadAttention(4, n_embd//4)
-        self.feedforward = FeedFoward(n_embd)
-        self.languagemodel_head = nn.Linear(n_embd, vocab_size)
+        #self.blocks = nn.Sequential(
+        #    TransformerBlock(n_embd, n_head=4),
+        #    TransformerBlock(n_embd, n_head=4),
+        #    TransformerBlock(n_embd, n_head=4),
+        #    nn.LayerNorm(n_embd),
+        #)
+        #Making dependant of n_layer
+        self.blocks = nn.Sequential(*[TransformerBlock(n_embd, n_head=n_head) for _ in range(n_layer)])
+        self.ln_f = nn.LayerNorm(n_embd) # final layer norm
+        self.lm_head = nn.Linear(n_embd, vocab_size)
+
 
     def forward(self, idx, targets=None):
         B, T = idx.shape  # Batch size, Sequence length/block_size
@@ -177,10 +194,11 @@ class BigramLanguageModel(nn.Module):
         pos_embd = self.position_embedding_table(torch.arange(T, device=idx.device)) # Shape: (sequence_length, n_embd)
         
         x= tok_embd + pos_embd #x is the sum(!!!) of the token and position embeddings
-        x= self.selfattn_heads(x) # Shape: (batch_size, sequence_length, n_embd)
-        x=self.feedforward(x) # B,T,C
-
-        logits = self.languagemodel_head(x) # Shape: (batch_size, sequence_length, vocab_size)
+        #x= self.selfattn_heads(x) # Shape: (batch_size, sequence_length, n_embd)
+        #x=self.feedforward(x) # B,T,C
+        x = self.blocks(x) # B,T,C
+        x = self.ln_f(x) # B,T,C
+        logits = self.lm_head(x) # Shape: (batch_size, sequence_length, vocab_size)
 
         if targets is None:
             loss = None# If no targets provided, don't compute loss
