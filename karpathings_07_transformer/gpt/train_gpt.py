@@ -284,6 +284,12 @@ os.makedirs("models", exist_ok=True)
 
 best_val_loss = float('inf')  # Initialize best validation loss
 
+from datetime import datetime
+
+
+print(f"Current hour: {datetime.now()}")
+
+
 for iter in range(max_iters):
 
     # every once in a while evaluate the loss on train and val sets
@@ -307,6 +313,9 @@ for iter in range(max_iters):
     optimizer.zero_grad(set_to_none=True)
     loss.backward()
     optimizer.step()
+
+current_hour = datetime.now().hour
+print(f"Current hour: {datetime.now()}")
 
 torch.save(model.state_dict(), "models/gpt_last.pt")
 print("Training complete!")
