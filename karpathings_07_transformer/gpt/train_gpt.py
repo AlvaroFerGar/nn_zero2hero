@@ -116,7 +116,7 @@ class MultiHeadAttention(nn.Module):
        super().__init__()
        # Create multiple attention heads in a list
        self.heads = nn.ModuleList([Head(head_size) for _ in range(num_heads)])
-       self.projection = nn.Linear(n_embd, n_embd)
+       self.proj = nn.Linear(n_embd, n_embd)
        self.dropout = nn.Dropout(dropout)
 
    def forward(self, x):

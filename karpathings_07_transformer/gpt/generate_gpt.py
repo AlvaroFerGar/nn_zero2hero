@@ -69,7 +69,7 @@ class MultiHeadAttention(nn.Module):
        super().__init__()
        # Create multiple attention heads in a list
        self.heads = nn.ModuleList([Head(head_size) for _ in range(num_heads)])
-       self.projection = nn.Linear(n_embd, n_embd)
+       self.proj = nn.Linear(n_embd, n_embd)
        self.dropout = nn.Dropout(dropout)
 
    def forward(self, x):
@@ -237,6 +237,8 @@ model.eval()  # Set to evaluation mode
 
 # Generate text
 context = torch.zeros((1, 1), dtype=torch.long, device=device)
-generated_text = decode(model.generate(context, max_new_tokens=500)[0].tolist())
+generated_text = decode(model.generate(context, max_new_tokens=10000)[0].tolist())
 
+with open("output.txt", "w", encoding="utf-8") as f:
+    f.write(generated_text)
 print(generated_text)
