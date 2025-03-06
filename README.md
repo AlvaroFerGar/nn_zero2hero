@@ -39,6 +39,13 @@ Replacing loss.backwards() with a manual backprop implementation
 - [nb📘](karpathings_06_wavenet/makemore_05_fixes.ipynb): Bug fixes in previous MLP works.
 - [nb📗](karpathings_06_wavenet/makemore_05_wavenet.ipynb): Implementing WaveNet
 
+### 🤖🦶 07-Transformers
+Creating a transformer architecture from scratch. Training it with *Monty Python Flying Circus'* scripts.
+- [**Readme**](karpathings_07_transformer/README.md)
+- [nb📕](karpathings_07_transformer/gpt_developing.ipynb): Data cleaning and initial work.
+- [nb📘](karpathings_07_transformer/self_attention.ipynb): Explanation of some of the transformer component.
+- 🐍: Code for train and generate text with a bigram model and with a gpt model.
+
 ## 🔗 References
 
 - [Neural Networks: Zero to Hero Lecture Series](https://www.youtube.com/watch?v=VMj-3S1tku0&list=PLAqhIrjkxbuWI23v9cThsA9GvCAUhRvKZ)
