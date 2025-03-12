@@ -46,6 +46,12 @@ Creating a transformer architecture from scratch. Training it with *Monty Python
 - [nb📘](karpathings_07_transformer/self_attention.ipynb): Explanation of some of the transformer component.
 - 🐍: Code for train and generate text with a bigram model and with a gpt model.
 
+### 🧩🧱 08-Tokenization
+Quick review of the tokenization process and its key points.
+- [**Readme**](karpathings_08_tokenization/README.md)
+- [nb📕](karpathings_08_tokenization/tokenization.ipynb): Tokenization work and comments.
+
+
 ## 🔗 References
 
 - [Neural Networks: Zero to Hero Lecture Series](https://www.youtube.com/watch?v=VMj-3S1tku0&list=PLAqhIrjkxbuWI23v9cThsA9GvCAUhRvKZ)
